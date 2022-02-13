@@ -14,3 +14,4 @@ sqlquery.exe [файл]
 строки с префиксом "--" считаются комментарием и пропускаются.
 Так-же пропускаются пустые строки.
 
+![screenshot](https://raw.githubusercontent.com/trdm/sqlquery/main/Doc/Screenshot_178.png)
