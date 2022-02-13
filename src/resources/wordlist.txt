@@ -1,0 +1,57 @@
+all
+alter
+and
+as
+between
+case
+cast
+coalesce
+cost
+create
+create table _TName_
+distinct
+else
+except
+exists
+from
+function
+group by
+having
+in
+inner join
+insert into _TName_ values
+integer
+intersect
+into
+is
+isnull
+join
+language
+left
+like
+logical
+not
+null
+number
+on
+or
+order
+outer join
+primary key
+replace
+returns
+right
+select
+select from where
+table
+then
+union
+update
+using
+values
+varchar
+view
+volatile
+when
+where
+with
