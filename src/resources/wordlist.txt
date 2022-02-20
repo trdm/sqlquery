@@ -1,57 +1,58 @@
-all
-alter
+ALL
+ALTER
 and
 as
-between
-case
-cast
-coalesce
-cost
-create
-create table _TName_
+BETWEEN
+CASE
+CAST
+COALESCE
+COST
+CREATE
+CREATE TABLE
 distinct
 else
 except
 exists
-from
+FROM
 function
-group by
-having
+GROUP BY
+HAVING
 in
-inner join
-insert into _TName_ values
+INNER JOIN
+INSERT INTO ... values
 integer
 intersect
-into
-is
-isnull
-join
+INTO
+IS
+ISNULL
+JOIN
 language
-left
-like
+LEFT
+LIKE
 logical
-not
-null
+NOT
+NULL
 number
 on
 or
-order
-outer join
-primary key
-replace
+ORDER BY
+OUTER JOIN
+PRIMARY KEY
+REPLACE
 returns
-right
-select
-select from where
-table
-then
-union
-update
+RIGHT
+SELECT
+SELECT FROM --WHERE ORDER BY
+TABLE
+THEN
+UNION
+UNION ALL
+UPDATE
 using
-values
+VALUES
 varchar
 view
 volatile
-when
-where
-with
+WHEN
+WHERE
+WITH

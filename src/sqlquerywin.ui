@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>553</width>
+    <width>442</width>
     <height>364</height>
    </rect>
   </property>
@@ -15,17 +15,41 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing">
+     <number>3</number>
+    </property>
+    <property name="leftMargin">
+     <number>6</number>
+    </property>
+    <property name="topMargin">
+     <number>6</number>
+    </property>
+    <property name="rightMargin">
+     <number>6</number>
+    </property>
+    <property name="bottomMargin">
+     <number>6</number>
+    </property>
     <item>
      <widget class="QLabel" name="label">
+      <property name="minimumSize">
+       <size>
+        <width>400</width>
+        <height>0</height>
+       </size>
+      </property>
       <property name="font">
        <font>
-        <pointsize>9</pointsize>
-        <weight>75</weight>
-        <bold>true</bold>
+        <pointsize>8</pointsize>
+        <weight>50</weight>
+        <bold>false</bold>
        </font>
       </property>
       <property name="text">
        <string>Disconnected</string>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
       </property>
      </widget>
     </item>
@@ -211,7 +235,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>553</width>
+     <width>442</width>
      <height>18</height>
     </rect>
    </property>
@@ -240,7 +264,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>&amp;Run</string>
+    <string>&amp;Run F5</string>
    </property>
    <property name="statusTip">
     <string>Run query</string>

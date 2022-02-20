@@ -1,4 +1,5 @@
 #include "ui_sqlquerywin.h"
+#include "textedit.h"
 class QCompleter;
 class TextEdit;
 class QAbstractItemModel;
@@ -35,18 +36,22 @@ private slots:
 protected:
     virtual void closeEvent(QCloseEvent *event);
     QAbstractItemModel *modelFromFile(const QString& fileName);
+	QStringList listFromFile(const QString& fileName);
     QSqlDatabase db;
     QSqlQuery *query;
     bool connected;
     QStringList tables;
-    QStringListModel *listmodel;
-    QString dbmode;
+	QStringListModel *listmodel;
+	QStringList m_addWordCompleter;
+	void updateCompleter();
+
+	QString dbmode;
     QString host;
     int port;
 	QString dbname;
 	QString dbfilename;
 	QString username;
     QString password;
-    QCompleter *completer;
+	MyCompleter *completer;
 
 };

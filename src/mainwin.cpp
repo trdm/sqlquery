@@ -48,14 +48,8 @@ MainWin::MainWin() : QMainWindow() {
     listmodel->setStringList(tables);
     listTables->setModel(listmodel);
     listTables->setEditTriggers(QAbstractItemView::NoEditTriggers);
-
-    completer = new QCompleter(teQuery);
-    completer->setModel(modelFromFile(":/resources/wordlist.txt"));
-    completer->setModelSorting(QCompleter::CaseInsensitivelySortedModel);
-    completer->setCaseSensitivity(Qt::CaseInsensitive);
-    completer->setWrapAround(false);
-    teQuery->setCompleter(completer);
-
+	completer = 0;
+	updateCompleter();
 
 	connect(this, SIGNAL(connectChanged(bool)),   this, SLOT(showStatus(bool)));
 	connect(actionAddCvs, SIGNAL(triggered(bool)),   this, SLOT(addTextFile()));
@@ -116,6 +110,9 @@ void MainWin::openFile(QString psFile)
 
 bool MainWin::query_exec(QString psQText, bool psTahQ)
 {
+	if (psQText.isEmpty()) {
+		return false;
+	}
 	query = new QSqlQuery(db);
 
 	if ( query->exec(psQText) ){
@@ -232,6 +229,9 @@ bool MainWin::loadCSVTextInMemory(QString psFile, QString psFName)
 			if (vQueIsCreate) {
 				vText = vCaptions.at(var-1);
 				vText = vText.trimmed();
+				if (!m_addWordCompleter.contains(vText)) {
+					m_addWordCompleter.append(vText);
+				}
 				if (vQueIsCreate) {
 					vText.append(" TEXT");
 				}
@@ -349,7 +349,7 @@ bool MainWin::loadCsvdfl(QString psFile, int psAsCSV )
 		//loadTextInMemory
 	}
 	vFile.close();
-
+	updateCompleter();
 	return true;
 }
 
@@ -364,29 +364,75 @@ bool MainWin::addTextFile()
 	return true;
 }
 
+QStringList MainWin::listFromFile(const QString &fileName)
+{
+	QStringList words;
+	QFile file(fileName);
+	if (!file.open(QFile::ReadOnly))
+		return words;
+
+#ifndef QT_NO_CURSOR
+	QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
+#endif
+
+	while (!file.atEnd()) {
+		QByteArray line = file.readLine();
+		if (!line.isEmpty())
+			words << line.trimmed();
+	}
+	words << QString::fromUtf8("data_time");
+	words << QString::fromUtf8("comments");
+	words.sort();
+	QString vStr = "";
+	if (m_addWordCompleter.size() != 0) {
+		for (int var = 0; var < m_addWordCompleter.size(); ++var) {
+			vStr = m_addWordCompleter.at(var).trimmed();
+			if (!words.contains(vStr)) {
+				words << vStr;
+			}
+		}
+	}
+	if (tables.size() != 0) {
+		for (int var = 0; var < tables.size(); ++var) {
+			vStr = tables.at(var).trimmed();
+			if (!words.contains(vStr)) {
+				words << vStr;
+			}
+		}
+	}
+	words.sort();
+
+#ifndef QT_NO_CURSOR
+	QApplication::restoreOverrideCursor();
+#endif
+//	foreach (QString var, words) {
+//		qDebug() << "words: "<< var;
+//	}
+//	qDebug() << "words.count()"<< words.count();
+	return words;
+}
+
 
 QAbstractItemModel *MainWin::modelFromFile(const QString& fileName)
 {
-    QFile file(fileName);
-    if (!file.open(QFile::ReadOnly))
-        return new QStringListModel(completer);
+	QStringList words = listFromFile(fileName);
+	return new QStringListModel(words, completer);
+}
 
-#ifndef QT_NO_CURSOR
-    QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
-#endif
-    QStringList words;
 
-    while (!file.atEnd()) {
-        QByteArray line = file.readLine();
-        if (!line.isEmpty())
-            words << line.trimmed();
-    }
-    words.sort();
+void MainWin::updateCompleter(){
+	if (!completer) {
+		delete completer;
+	}
+	QStringList words = listFromFile(":/resources/wordlist.txt");
+	completer = new MyCompleter(words,teQuery);
+//	completer->setModel(modelFromFile(":/resources/wordlist.txt"));
+	completer->setModelSorting(QCompleter::CaseInsensitivelySortedModel);
+	completer->setCaseSensitivity(Qt::CaseInsensitive);
+	//completer->setF
+	completer->setWrapAround(true/*false*/);
+	teQuery->setCompleter(completer);
 
-#ifndef QT_NO_CURSOR
-    QApplication::restoreOverrideCursor();
-#endif
-    return new QStringListModel(words, completer);
 }
 
 void MainWin::on_actExit_triggered(){
@@ -510,6 +556,14 @@ void MainWin::on_teQuery_textChanged(){
 
 void MainWin::on_actRun_triggered(){
 	QString vText = teQuery->toPlainText();
+	QStringList li = vText.split("\n");
+	vText = "";
+	foreach (QString var, li) {
+		var = var.trimmed();
+		if (!var.startsWith("--")) {
+			vText.append(var).append("\n");
+		}
+	}
 	query_exec(vText);
 }
 

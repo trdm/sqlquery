@@ -42,12 +42,62 @@
 #define TEXTEDIT_H
 
 #include <QTextEdit>
-
+#include <QStringList>
+#include <QStringListModel>
+#include <QString>
+#include <QCompleter>
 QT_BEGIN_NAMESPACE
-class QCompleter;
+// !!! https://www.qtcentre.org/threads/23518-How-to-change-completion-rule-of-QCompleter
+//class QCompleter;
 QT_END_NAMESPACE
 
-//! [0]
+class MyCompleter : public QCompleter
+{
+		Q_OBJECT
+
+public:
+		inline MyCompleter(const QStringList& words, QObject * parent) :
+		QCompleter(parent), m_list(words), m_model()
+	{
+		setModel(&m_model);
+	}
+
+	inline void update(QString word)
+	{
+		// Do any filtering you like.
+		// Here we just include all items that contain word.
+		QStringList filtered = m_list.filter(word, caseSensitivity());
+		QStringList filtered2;
+		QString vWord = word, var1;
+		vWord = vWord.toLower();
+		foreach (QString var0, filtered) {
+			var1 = var0; var1 = var1.toLower();
+			if (var1 != vWord) {
+				filtered2 << var0; // не нужны уже набранные слова в попупе
+			}
+		}
+		m_model.setStringList(filtered2);
+		m_word = word;
+		complete();
+	}
+	inline void updateList(const QStringList& words)
+	{
+		m_list.clear();
+		foreach (QString var, words) {
+			m_list << var;
+		}
+	}
+
+	inline QString word()
+	{
+		return m_word;
+	}
+
+private:
+	QStringList m_list;
+	QStringListModel m_model;
+	QString m_word;
+};
 class TextEdit : public QTextEdit
 {
     Q_OBJECT
@@ -56,8 +106,9 @@ public:
     TextEdit(QWidget *parent = 0);
     ~TextEdit();
 
-    void setCompleter(QCompleter *c);
-    QCompleter *completer() const;
+	void setCompleter(MyCompleter *c);
+	MyCompleter *completer() const;
+	void updateList(const QStringList& words);
 
 protected:
     void keyPressEvent(QKeyEvent *e);
@@ -70,7 +121,7 @@ private:
     QString textUnderCursor() const;
 
 private:
-    QCompleter *c;
+	MyCompleter *c;
 };
 //! [0]
 
