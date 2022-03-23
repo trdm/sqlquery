@@ -47,6 +47,7 @@
 #include <QModelIndex>
 #include <QAbstractItemModel>
 #include <QScrollBar>
+#include <QMenu>
 
 TextEdit::TextEdit(QWidget *parent)
 : QTextEdit(parent), c(0)
@@ -102,7 +103,17 @@ void TextEdit::focusInEvent(QFocusEvent *e)
 {
     if (c)
         c->setWidget(this);
-    QTextEdit::focusInEvent(e);
+	QTextEdit::focusInEvent(e);
+}
+
+// trdm 2022-03-17 23:08:44
+void TextEdit::contextMenuEvent(QContextMenuEvent *event) {
+	//http://www.prog.org.ru/topic_13418_0.html
+	QMenu *menu = createStandardContextMenu();
+	menu->addAction(tr("My Menu Item"));
+	 //...
+	 menu->exec(event->globalPos());
+	 delete menu;
 }
 void TextEdit::keyPressEvent(QKeyEvent *e)
 {

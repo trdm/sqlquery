@@ -113,6 +113,7 @@ public:
 protected:
     void keyPressEvent(QKeyEvent *e);
     void focusInEvent(QFocusEvent *e);
+	void contextMenuEvent(QContextMenuEvent *event);
 
 private slots:
     void insertCompletion(const QString &completion);

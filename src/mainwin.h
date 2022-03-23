@@ -10,11 +10,11 @@ class MainWin : public QMainWindow, public Ui_SqlQueryMainWin {
 public:
     MainWin();
 	void openFile(QString psFile);
-	bool loadCSVTextInMemory(QString psFile, QString psFName);
+	bool loadCSVTextInMemory(QString psFile, QString psFName, QString psLineSep = ",");
 	bool loadTextInMemory(QString psFile, QString psFName);
 	bool loadCsvdfl(QString psFile, int psAsCSV = 1);
 	bool createDBMemory(QString psFile);
-	bool query_exec(QString psQText, bool psTahQ = false);
+	bool query_exec(QString psQText, bool psTahQ = false, bool psToExport = false);
 
 
 signals:
@@ -30,6 +30,7 @@ private slots:
     void on_actRun_triggered();
     void showResult();
 	void showHelp();
+	void export2File();
     void showTable(const QString& name);
     void on_listTables_doubleClicked(const QModelIndex& index);
 	bool addTextFile();
@@ -44,14 +45,21 @@ protected:
 	QStringListModel *listmodel;
 	QStringList m_addWordCompleter;
 	void updateCompleter();
-
+	QString getAliveQuery();
+	void message(QString psMsg);
+	QString getNormalSqlField(QString psInput, int psIsField = 1);
+	QString extractType(QString& psField);
+	QString getNormalSqlField2(QString psInput, int psIsField = 1, QString psFieldType = "");
+	int m_fldCntr, m_tableCnrt;
 	QString dbmode;
     QString host;
     int port;
 	QString dbname;
+	QString m_versionText;
 	QString dbfilename;
 	QString username;
     QString password;
 	MyCompleter *completer;
+	QMap<QString, QString> m_files_map;
 
 };

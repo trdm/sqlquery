@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>442</width>
-    <height>364</height>
+    <width>723</width>
+    <height>441</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -140,6 +140,7 @@
          </property>
          <property name="font">
           <font>
+           <family>Courier</family>
            <pointsize>10</pointsize>
           </font>
          </property>
@@ -225,6 +226,7 @@
    <addaction name="actDisconnect"/>
    <addaction name="separator"/>
    <addaction name="actRun"/>
+   <addaction name="actionRun2File"/>
    <addaction name="separator"/>
    <addaction name="actionhelp"/>
    <addaction name="actExit"/>
@@ -235,7 +237,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>442</width>
+     <width>723</width>
      <height>18</height>
     </rect>
    </property>
@@ -303,6 +305,14 @@
    </property>
    <property name="toolTip">
     <string>help</string>
+   </property>
+  </action>
+  <action name="actionRun2File">
+   <property name="text">
+    <string>Run &gt;&gt; file</string>
+   </property>
+   <property name="shortcut">
+    <string>F6</string>
    </property>
   </action>
  </widget>

@@ -5,37 +5,36 @@
 #include "connectdlg.h"
 #include "sqlhighlighter.h"
 
+const QString gSpliterStyle =
+"QSplitter::handle { "
+"background :qlineargradient(spread:pad, x1:0.993909, y1:0.455, x2:0, y2:0.511, stop:0 rgba(172, 172, 172, 255), stop:1 rgba(255, 255, 255, 255));"
+"width: 5px; "
+"height: 5px; "
+""
+"border-radius: 2px;"
+"}"
+"QSplitterHandle::hover{}"
+"QSplitter::handle:horizontal:hover {background:qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(102, 102, 102, 255), stop:1 rgba(255, 255, 255, 255));}"
+"QSplitter::handle:vertical:hover {background:qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(102, 102, 102, 255), stop:1 rgba(255, 255, 255, 255));}"
+;
+
 MainWin::MainWin() : QMainWindow() {
     setupUi(this);
     SQLHighlighter *sqlhighlighter = new SQLHighlighter(teQuery->document());
-    /*
-    teQuery->setText(QString::fromUtf8(
-        "create table employee \n"
-         "id integer primary key, \n"
-        "name varchar(50), \n"
-        "department integer, \n"
-        "salary number(14,2), \n"
-        "married logical);\n"
-        "\n"
-        "create table department ( \n"
-        "id integer primary key, \n"
-        "name varchar(35));\n"
-        "\n"
-        "insert into department(id, name) values(1, 'Дирекция');\n"
-        "insert into department(id, name) values(2, 'Бухгалтерия');\n"
-        "insert into department(id, name) values(3, 'Отдел кадров');\n"
-        "\n"
-         "insert into employee(id, name, department, salary, married) \n"
-               "values(1, 'Винни-Пух', 1, 1234.56, 1);\n"
-        "\n"
-        "insert into employee(id, name, department, salary, married) \n"
-            "values(2, 'Пятачок', 3, 6543.21, 0);\n"
-        "\n"
-        "insert into employee(id, name, department, salary, married) \n"
-        "    values(3, 'Ослик Иа', 2, 23.45, 0);\n"
-        "\n"
-        "select * from employee;\n"));
-    */
+	QString vDate = QString("%1").arg(__DATE__);
+	vDate = vDate.replace("  "," ");
+	QStringList vDatesList = vDate.split(" ");
+	if (vDatesList.size() == 3) {
+		vDate = vDatesList.at(2) +"_"+ vDatesList.at(0)+ "_" + vDatesList.at(1);
+	}
+
+
+	m_versionText = QString("(%1-%2)").arg(vDate).arg(__TIME__); //
+	splitter->setStyleSheet(gSpliterStyle);
+	splitter_3->setStyleSheet(gSpliterStyle);
+	splitter_2->setStyleSheet(gSpliterStyle);
+
+	teQuery->setTabStopWidth(30);
     connected = false;
     dbname = "";
 	dbfilename = "";
@@ -49,12 +48,21 @@ MainWin::MainWin() : QMainWindow() {
     listTables->setModel(listmodel);
     listTables->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	completer = 0;
+	m_fldCntr = m_tableCnrt = 0;
 	updateCompleter();
+
 
 	connect(this, SIGNAL(connectChanged(bool)),   this, SLOT(showStatus(bool)));
 	connect(actionAddCvs, SIGNAL(triggered(bool)),   this, SLOT(addTextFile()));
 	connect(actionhelp, SIGNAL(triggered(bool)),   this, SLOT(showHelp()));
+	connect(actionRun2File, SIGNAL(triggered(bool)),   this, SLOT(export2File()));
+
 	emit connectChanged(false);
+
+
+//    ui->setupUi(this);
+//    ui->m_versionText->setText(vText);
+
 }
 
 void MainWin::openFile(QString psFile)
@@ -105,29 +113,36 @@ void MainWin::openFile(QString psFile)
 		}
 	}
 	setWindowTitle("Sql Query " + psFile);
+	updateCompleter();
 }
 
 
-bool MainWin::query_exec(QString psQText, bool psTahQ)
+bool MainWin::query_exec(QString psQText, bool psTahQ, bool psToExport)
 {
 	if (psQText.isEmpty()) {
 		return false;
 	}
+	QString vQText = psQText;
+
+	vQText = vQText.trimmed();
 	query = new QSqlQuery(db);
 
 	if ( query->exec(psQText) ){
 		if (query->isSelect())
-			showResult();
+			if (!psToExport) {
+				showResult();
+			}
 		if (!psTahQ) {
-			teLog->append( tr("<p><b>Query succeeded:</b><br />")	+ psQText );
+			teLog->append( tr("<b>Query succeeded: </b>")	+ vQText );			//teLog->append( tr("<br /><b>Query succeeded: </b>")	+ vQText );
+
 		}
 		sb->showMessage(tr("Query executed successfully"), 3000);
 	}else{
 		sb->showMessage(tr("Query error"), 3000);
-		QMessageBox::critical(
-		this, tr("Query Error"),
-		query->lastError().text(),
-		QMessageBox::Ok );
+		// <span style=" color:#ff0000;">features</span>
+		QString vErrorMsg = QString::fromUtf8("<b>Query: </b> '%1' has error:<span style="" color:#ff0000;""> '%2' </span>").arg(vQText).arg(query->lastError().text());
+		teLog->append( vErrorMsg );
+		//QMessageBox::critical(	this, tr("Query Error"), 	query->lastError().text(),		QMessageBox::Ok );
 		return false;
 	}
 	return true;
@@ -155,7 +170,7 @@ bool MainWin::createDBMemory(QString psFile)
 
 
 
-bool MainWin::loadCSVTextInMemory(QString psFile, QString psFName)
+bool MainWin::loadCSVTextInMemory(QString psFile, QString psFName, QString psLineSep)
 {
 	dbfilename = psFile;
 	if (!createDBMemory(psFile)) {
@@ -170,9 +185,17 @@ bool MainWin::loadCSVTextInMemory(QString psFile, QString psFName)
 	if (!vFile.open(QIODevice::ReadOnly | QIODevice::Text))
 		return false;
 	query = new QSqlQuery(db);
+	m_fldCntr = 0; // сброим для таблицы
+	QString vFName = psFName;
+	vFName = getNormalSqlField(vFName,0);
+	if (vFName != psFName) {
+		message(QString("<b>Translate table name:</b> '%1' >> '%2'").arg(psFName).arg(vFName));
+	}
 
-
-	QString vLineSep = ",", vLineTQ = "\"", vLineMArcSett = "--settings:",vText = "";
+	QString vLineSep = ",", vLineTQ = "\"", vLineMArcSett = "--settings:",vText = "",vText0 = "";
+	if (!psLineSep.isEmpty()) {
+		vLineSep = psLineSep;
+	}
 	QString vQuery;
 	QString line, lineLC;
 	while (!vFile.atEnd()) {
@@ -209,7 +232,10 @@ bool MainWin::loadCSVTextInMemory(QString psFile, QString psFName)
 				}
 				continue;
 			} else {
-				if (lineLC.indexOf("select") != -1) {
+				int vFounds = qMax(lineLC.indexOf("select"),lineLC.indexOf("insert"));
+				vFounds = qMax(vFounds,lineLC.indexOf("update"));
+				vFounds = qMax(vFounds,lineLC.indexOf("alter"));
+				if (vFounds != -1) {
 					vQueries.append(line);
 				}
 				//line = line.mid(2);
@@ -217,23 +243,48 @@ bool MainWin::loadCSVTextInMemory(QString psFile, QString psFName)
 			continue;
 		} //line.startsWith("--")
 		bool vQueIsCreate = false;
+		if (vCaptions.size() == 0) {
+			// trdm 2022-02-24 12:06:35
+			if (line.indexOf(vLineSep) == -1) {
+				if (line.indexOf(";") != -1) {
+					vLineSep = ";";
+				}
+			}
+		}
 		vFieldsData = line.split(vLineSep);
-		vQuery = "INSERT INTO " + psFName + " VALUES(";
+		vQuery = "INSERT INTO " + vFName + " VALUES(";
 		if (vCaptions.size() == 0) {
 			vCaptions = line.split(vLineSep);
-			vQuery = "CREATE TABLE " + psFName + " (";
+			vQuery = "CREATE TABLE " + vFName + " (";
 			vQueIsCreate = true;
 		}
+		QString vTypeField = "TEXT", vTypeField_t;
 		for (int var = 1; var <= vCaptions.size(); ++var) {
 			vText = "";
 			if (vQueIsCreate) {
+				m_fldCntr++;
+				vTypeField = "TEXT";
 				vText = vCaptions.at(var-1);
-				vText = vText.trimmed();
+				vText0 = vText.trimmed();
+				vText = vText0;
+				if (vText.startsWith("\"") && vText.endsWith("\"")) {
+					vText = vText.mid(1,vText.length() -2); // Убираем "" с начали и с конца.
+				}
+				vText = getNormalSqlField(vText);
+				vTypeField_t = extractType(vText);
+				if (!vTypeField_t.isEmpty()) {
+					vTypeField = vTypeField_t;
+				}
+				if (vText != vText0) {
+					message(QString("Translate field name: '%1' << '%2'").arg(vText).arg(vText0));
+				}
+
 				if (!m_addWordCompleter.contains(vText)) {
 					m_addWordCompleter.append(vText);
 				}
 				if (vQueIsCreate) {
-					vText.append(" TEXT");
+					vText.append(" ");
+					vText.append(vTypeField);
 				}
 				if (var != vCaptions.size()) {
 					vText.append(", ");
@@ -243,6 +294,9 @@ bool MainWin::loadCSVTextInMemory(QString psFile, QString psFName)
 					vText = vFieldsData.at(var-1);
 					vText = vText.trimmed();
 				}
+				if (vText.startsWith("\"") && vText.endsWith("\"")) {
+					vText = vText.mid(1,vText.length() -2); // Убираем "" с начали и с конца.
+				}
 				vText.append("'").prepend("'");
 				if (var != vCaptions.size()) {
 					vText.append(", ");
@@ -251,17 +305,21 @@ bool MainWin::loadCSVTextInMemory(QString psFile, QString psFName)
 			vQuery.append(vText);
 		}
 		vQuery.append(")");
-		qDebug() << vQuery;
+		// qDebug() << vQuery;
 
 		if ( query_exec(vQuery,true) ){
 			if (vQueIsCreate) {
 				getTables();
+				message(vQuery);
 			}
 		}
 	}
 	for (int var = 0; var < vQueries.size(); ++var) {
 		vQuery = vQueries.at(var);
-		int vPos = vQuery.indexOf("SELECT");
+		int vPos = vQuery.indexOf("SELECT")+vQuery.indexOf("ALTER")+vQuery.indexOf("UPDATE");
+//		-- ALTER TABLE __wordSize ADD size_n numeric;
+//		-- UPDATE __wordSize SET size_n = CAST(size AS INTEGER)
+
 		if (vPos != -1) {
 			teQuery->append( vQuery );
 		} else {
@@ -323,7 +381,10 @@ bool MainWin::loadCsvdfl(QString psFile, int psAsCSV )
 	QString line;
 	QFileInfo vFileInfo(psFile);
 	QString vFileName, vFilePath = vFileInfo.dir().path();
+	QString vLineSep = ",";
 	vFilePath = vFilePath.replace("/","\\");
+	int vPos = 0;
+	m_fldCntr = m_tableCnrt = 0;
 	vFilePath.append("\\");
 	while (!vFile.atEnd()) {
 		line = vFile.readLine(); // read wavelength line and store it
@@ -331,8 +392,20 @@ bool MainWin::loadCsvdfl(QString psFile, int psAsCSV )
 		if (line.isEmpty() || line.length() < 3) {// может быть \n или \r\n
 			continue;
 		}
-		if (line.startsWith("--") || line.isEmpty()) {
+		if (line.isEmpty()) {
 			continue;
+		}
+		if (line.startsWith("--")){
+			vPos = line.indexOf("separator");
+			if (vPos != -1) {
+				vPos = line.indexOf("=");
+				if (vPos != -1) {
+					vLineSep = line.mid(vPos+1);
+					if (vLineSep.length() >=3) { // уберем кавычки
+						vLineSep = vLineSep.mid(1,vLineSep.length()-2);
+					}
+				}
+			}
 		}
 		vFileName = line;
 		if (line.indexOf("/") == -1 && line.indexOf("\\") == -1) {
@@ -340,8 +413,9 @@ bool MainWin::loadCsvdfl(QString psFile, int psAsCSV )
 		}
 		if (QFile::exists(vFileName)) {
 			QFileInfo vFileInfo2(vFileName);
+			m_tableCnrt++;
 			if (psAsCSV == 1) {
-				loadCSVTextInMemory(vFileName,vFileInfo2.baseName());
+				loadCSVTextInMemory(vFileName,vFileInfo2.baseName(),vLineSep);
 			} else {
 				loadTextInMemory(vFileName,vFileInfo2.baseName());
 			}
@@ -358,8 +432,7 @@ bool MainWin::addTextFile()
 {
 	QString fileName = QFileDialog::getOpenFileName(this);
 	if (!fileName.isEmpty()){
-//		leDbname->setText(fileName);
-//		saveFile();
+		openFile(fileName);
 	}
 	return true;
 }
@@ -435,6 +508,93 @@ void MainWin::updateCompleter(){
 
 }
 
+QString MainWin::getAliveQuery()
+{
+	QString vText = teQuery->toPlainText();
+	QStringList li = vText.split("\n");
+	vText = "";
+	foreach (QString var, li) {
+		var = var.trimmed();
+		if (!var.startsWith("--")) {
+			vText.append(var).append("\n");
+		}
+	}
+	vText = vText.trimmed();
+	return vText;
+}
+
+// trdm 2022-03-16 12:02:56
+void MainWin::message(QString psMsg)
+{
+	//QString vErrorMsg = QString::fromUtf8("%1 <br />").arg(psMsg);
+	QString vErrorMsg = QString::fromUtf8("%1 ").arg(psMsg);
+	teLog->append( vErrorMsg );
+
+}
+
+// trdm 2022-03-16 11:35:51 в csv иногда попадаются кирилические поля
+QString MainWin::getNormalSqlField(QString psInput, int psIsField)
+{
+	QString vLarChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+	QString vRetVal = "";
+	QChar vHr;
+	for (int var = 0; var < psInput.length(); ++var) {
+		vHr = psInput.at(var);
+		if (vLarChars.indexOf(vHr) != -1) {
+			vRetVal.append(vHr);
+		}
+	}
+	QString vPrep = "table_";
+	QString vApendCntr = QString("%1").arg(m_tableCnrt);
+	if (psIsField == 1) {
+		vPrep = "field_";
+		vApendCntr = QString("%1").arg(m_fldCntr);
+	}
+	if (vRetVal.length() == 0) {
+		vRetVal = vPrep;
+		vRetVal.append(vApendCntr);
+	} else {
+		vHr = vRetVal.at(0);
+		if (!(vHr.isLetter() || vHr == '_')) {
+			vRetVal = vPrep;
+			vRetVal.append(vApendCntr);
+		}
+	}
+	return vRetVal;
+
+}
+
+QString MainWin::extractType(QString &psField)
+{
+	QString vTypeRv = "", vFieldName = psField;
+	int vPos = psField.indexOf("_");
+	if (vPos != -1) {
+		// field_astype_TYPE
+		QStringList vList = psField.split("_");
+
+		QStringList vListTypeLC = QString("INTEGER").split(",");
+		int vSz = vList.size();
+		if (vSz >= 3 ) {
+			QString vTypes_ = "INTEGER,INT,NUMERIC";
+			vTypes_ = vTypes_.toLower();
+			QStringList vListTypeLC = vTypes_.split(",");
+
+			QString vMarker = "", vType = "";
+			vMarker = vList.at(vSz-2); vMarker = vMarker.toLower();
+			vType = vList.at(vSz-1); vType = vType.toLower();
+			if (vMarker == "astype" && vListTypeLC.indexOf(vType) != 0) {
+				vSz = 1+1+6+vType.length();
+				vFieldName = vFieldName.mid(0, vFieldName.length() - (vSz));
+				psField = vFieldName;
+				vTypeRv = vType;
+			}
+
+
+		}
+	}
+	return vTypeRv;
+}
+
 void MainWin::on_actExit_triggered(){
     close();
 }
@@ -472,10 +632,7 @@ void MainWin::on_actConnect_triggered(){
         connected = db.open();
         emit connectChanged(connected);
         if (!connected)
-            QMessageBox::critical(
-                &dlg, tr("Connect Error"),
-                db.lastError().text(),
-                QMessageBox::Ok );
+			QMessageBox::critical(&dlg, tr("Connect Error"),db.lastError().text(), QMessageBox::Ok );
     }
 }
 
@@ -485,6 +642,8 @@ void MainWin::on_actDisconnect_triggered(){
 
     connected = false;
     connectChanged(connected);
+	dbfilename = "";
+	dbname = "";
 }
 
 void MainWin::on_actNew_triggered()
@@ -538,11 +697,15 @@ void MainWin::showStatus(bool state){
     actConnect->setEnabled(!connected);
     actDisconnect->setEnabled(connected);
 	//actionAddCvs->setEnabled(connected);
-    actRun->setEnabled( connected &&
-                       (teQuery->toPlainText().trimmed().length() > 0));
+	bool vEnabled = connected && (teQuery->toPlainText().trimmed().length() > 0);
+	actRun->setEnabled(vEnabled);
+	actionRun2File->setEnabled(vEnabled);
     if (state)
-		label->setText(tr("Connected: host=%1 dbname=%2 dbfilename=%3")
-		.arg(host) .arg(dbname).arg(dbfilename) ); //dbfilename = dbname;
+		if (!host.isEmpty()) {
+			label->setText(tr("Connected: host=%1 dbname=%2 dbfilename=%3 version=%4")	.arg(host) .arg(dbname).arg(dbfilename).arg(m_versionText) ); //dbfilename = dbname;
+		} else {
+			label->setText(tr("Connected: dbname=%1 dbfilename=%2 version=%3")	.arg(dbname).arg(dbfilename).arg(m_versionText) ); //dbfilename = dbname;
+		}
     else
         label->setText(tr("Disconnected"));
 
@@ -550,20 +713,14 @@ void MainWin::showStatus(bool state){
 }
 
 void MainWin::on_teQuery_textChanged(){
-    actRun->setEnabled( connected &&
-          (teQuery->toPlainText().trimmed().length() > 0));
+	bool vEnabled =  connected && (teQuery->toPlainText().trimmed().length() > 0);
+
+	actionRun2File->setEnabled(vEnabled);
+	actRun->setEnabled(vEnabled);
 }
 
 void MainWin::on_actRun_triggered(){
-	QString vText = teQuery->toPlainText();
-	QStringList li = vText.split("\n");
-	vText = "";
-	foreach (QString var, li) {
-		var = var.trimmed();
-		if (!var.startsWith("--")) {
-			vText.append(var).append("\n");
-		}
-	}
+	QString vText = getAliveQuery();
 	query_exec(vText);
 }
 
@@ -593,9 +750,52 @@ void MainWin::showHelp()
 	""));
 }
 
+void MainWin::export2File()
+{
+	QString vFaleName = "output.csv";
+	QString vDir = qApp->applicationDirPath(); vDir.append("\\").append(vFaleName);
+	vFaleName = QFileDialog::getSaveFileName(this,QString::fromUtf8("Выберите файл для импорта"),vDir,QString::fromUtf8("*.csv"));
+	qDebug() << vFaleName;
+	if (vFaleName.isEmpty()) {
+		return;
+	}
+	QString vText = getAliveQuery();
+	if (!query_exec(vText, true,true)) {
+		return;
+	}
+	QString vData;
+
+	QFile data(vFaleName);
+	if (data.open(QFile::WriteOnly)) {
+		QTextStream outTxt(&data);
+		bool firstLine=true;
+		while (query->next()) {
+			const QSqlRecord recrd= query->record();
+			if(firstLine){
+				for(int i=0;i<recrd.count();++i)
+					outTxt << recrd.field(i).name() << ','; //Headers
+			}
+			firstLine=false;
+			outTxt << "\r\n";
+			for(int i=0;i<recrd.count();++i) {
+				vData = recrd.value(i).toString();
+				if (i==0) {
+						//qDebug() << "vData" << vData;
+					}
+					outTxt << vData << ',';
+			}
+		}
+		data.close();
+	}
+}
+
 void MainWin::on_listTables_doubleClicked(const QModelIndex& index){
     if (index.isValid()){
-        showTable(listTables->model()->data(index).toString());
+		QString vTName = listTables->model()->data(index).toString();
+		/// \todo 2022-03-22 12:09:35
+
+		qDebug() << vTName;
+		showTable(vTName);
     }
 }
 
@@ -608,10 +808,7 @@ void MainWin::showTable(const QString& name){
 	QString ss; // = model->selectStatement();
     if (model->lastError().type() != QSqlError::NoError){
         sb->showMessage(tr("Query error"), 3000);
-        QMessageBox::critical(
-                this, tr("Query Error"),
-                model->lastError().text(),
-                QMessageBox::Ok );
+		QMessageBox::critical(this, tr("Query Error"), model->lastError().text(), QMessageBox::Ok );
     }
     tvResult->setModel(model);
     tvResult->setEditTriggers( QAbstractItemView::DoubleClicked 
