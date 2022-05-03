@@ -226,7 +226,9 @@
    <addaction name="actDisconnect"/>
    <addaction name="separator"/>
    <addaction name="actRun"/>
-   <addaction name="actionRun2File"/>
+   <addaction name="actExport2File"/>
+   <addaction name="separator"/>
+   <addaction name="actionComment"/>
    <addaction name="separator"/>
    <addaction name="actionhelp"/>
    <addaction name="actExit"/>
@@ -307,12 +309,31 @@
     <string>help</string>
    </property>
   </action>
-  <action name="actionRun2File">
+  <action name="actExport2File">
    <property name="text">
-    <string>Run &gt;&gt; file</string>
+    <string>Export</string>
+   </property>
+   <property name="toolTip">
+    <string>Export</string>
    </property>
    <property name="shortcut">
     <string>F6</string>
+   </property>
+  </action>
+  <action name="actionComment">
+   <property name="text">
+    <string>Comment (F7)</string>
+   </property>
+   <property name="toolTip">
+    <string>Comment/unomment/ (F7)</string>
+   </property>
+   <property name="shortcut">
+    <string>F7</string>
+   </property>
+  </action>
+  <action name="actionEdit">
+   <property name="text">
+    <string>Edit</string>
    </property>
   </action>
  </widget>

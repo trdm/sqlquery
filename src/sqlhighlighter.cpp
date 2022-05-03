@@ -32,6 +32,27 @@
 SQLHighlighter::SQLHighlighter(QTextDocument *parent)
   : QSyntaxHighlighter(parent)
 {
+	keywordFormat.setBackground(Qt::yellow/*Qt::gray*/);
+	//keywordFormat.setFontWeight(QFont::Bold);
+	commentStartExpression = QRegExp("/\\*");
+	commentEndExpression = QRegExp("\\*/");
+	multiLineCommentFormat.setForeground(Qt::darkGray);
+	multiLineCommentFormat.setForeground(Qt::darkCyan);
+
+}
+
+void SQLHighlighter::setWord(QString psWord)
+{
+	HighlightingRule rule;
+	highlightingRules.clear();
+	if (psWord.isEmpty()) {
+		return;
+	}
+	QString pattern = psWord;
+	pattern.append("\\b").prepend("\\b");
+	rule.pattern = QRegExp(pattern);
+	rule.format = keywordFormat;
+	highlightingRules.append(rule);
 
 }
 
@@ -41,19 +62,22 @@ void SQLHighlighter::highlightBlock(const QString &text)
 
 	setFormat (0, text.length(), Qt::black); 
 	
-    static const QRegExp commandsRegexp ("\\b(?:select|from|where|and|case|when|then|else|distinct|all|null|"
-										 "is|like|between|not|group|by|having|order|inner|outer|right|left|alter|with|isnull|cast|create|replace|function|"
-										 "returns|language|volatile|cost|table|view|or|"
-                                         "join|on|using|union|exists|in|as|intersect|except|coalesce|insert|into|update|"
-                                         "values|varchar|integer|number|logical|primary|key)\\b",
-										 Qt::CaseInsensitive);
+	static const QRegExp commandsRegexp (
+	"\\b(?:select|from|where|and|case|when|then|else|distinct|all|null|"
+	"is|like|between|not|group|by|having|order|inner|outer|right|left|alter|with|isnull|cast|create|replace|function|"
+	"returns|language|volatile|cost|table|view|or|"
+	"join|on|using|union|exists|in|as|intersect|except|coalesce|insert|into|update|"
+	"values|varchar|integer|number|logical|primary|key|add|set|asc|desc)\\b",
+	Qt::CaseInsensitive);
+
+
  	pos = 0;
 	while ((pos = commandsRegexp.indexIn (text, pos)) != -1)	{
-        setFormat (pos, commandsRegexp.matchedLength(), Qt::darkBlue);
+		setFormat (pos, commandsRegexp.matchedLength(), Qt::blue);
 		pos += commandsRegexp.matchedLength();
 	}
 
-	static const QRegExp aggregationsRegexp ("\\b(?:count|min|max)\\b\\s*\\([^\\)]+\\)", 
+	static const QRegExp aggregationsRegexp ("\\b(?:count|min|max|cast)\\b\\s*\\([^\\)]+\\)",
 						   Qt::CaseInsensitive);
  	pos = 0;
 	while ((pos = aggregationsRegexp.indexIn (text, pos)) != -1)	{
@@ -77,23 +101,67 @@ void SQLHighlighter::highlightBlock(const QString &text)
 		pos += stringsRegexp.matchedLength();
 	}
 
-    pos = 0;
-    static const QRegExp commentRegexp ("^\\s*(--)");
-    if ((pos = commentRegexp.indexIn (text, pos)) != -1)	{
-        setFormat (pos, text.length(), Qt::blue);
-        return;
-    }
-
-    pos = 0;
+	pos = 0;
 //    static const QRegExp operatorRegexp ("([+|\\(|\\]|\\)|\\.|\\;|\\*]){1,1}");
 //    static const QRegExp operatorRegexp ("([\\.|\\,|\\+|\\(|\\)]){1,1}");
 //    static const QRegExp operatorRegexp ("([\\,|\\+|\\(|\\)]){1,1}");
-    static const QRegExp operatorRegexp ("([,|\\.|\\(|\\)|\\+|\\-|\\*]){1,1}");
+	static const QRegExp operatorRegexp ("([,|\\.|\\(|\\)|\\+|\\-|\\*|\\=]){1,1}");
 
-    while ((pos = operatorRegexp.indexIn (text, pos)) != -1)	{
-        setFormat (pos, operatorRegexp.matchedLength(), Qt::red);
-        pos += operatorRegexp.matchedLength();
+	while ((pos = operatorRegexp.indexIn (text, pos)) != -1)	{
+		setFormat (pos, operatorRegexp.matchedLength(), Qt::red);
+		pos += operatorRegexp.matchedLength();
+	}
+
+    pos = 0;
+    static const QRegExp commentRegexp ("^\\s*(--)");
+    if ((pos = commentRegexp.indexIn (text, pos)) != -1)	{
+		setFormat (pos, text.length(), Qt::gray);
+		//return; // мешал остальному хайлайту
     }
+	pos = 0; // trdm 2022-04-22 10:53:51
+	static const QRegExp commentTitle ("^\\s*(--)\\s*\\btitle\\b",	Qt::CaseInsensitive);
+	if ((pos = commentTitle.indexIn (text, pos)) != -1)	{
+		setFormat (pos, text.length(), Qt::darkYellow);
+		//setFormat (pos, text.length(), Qt::darkMagenta);
+		//setFormat (pos, text.length(), Qt::magenta);
+	//return; // мешал остальному хайлайту
+	}
+
+
+	//qDebug() << "text: " << text;
+	foreach (const HighlightingRule &rule, highlightingRules) {
+		QRegExp expression(rule.pattern);
+		expression.setCaseSensitivity(Qt::CaseInsensitive);
+		int index = expression.indexIn(text);
+		while (index >= 0) {
+			int length = expression.matchedLength();
+			setFormat(index, length, rule.format);
+			index = expression.indexIn(text, index + length);
+		}
+	}
+
+	setCurrentBlockState(0);
+
+	int startIndex = 0;
+	if (previousBlockState() != 1)
+		startIndex = commentStartExpression.indexIn(text);
+
+	while (startIndex >= 0) {
+		int endIndex = commentEndExpression.indexIn(text, startIndex);
+		int commentLength;
+		if (endIndex == -1) {
+			setCurrentBlockState(1);
+			commentLength = text.length() - startIndex;
+		} else {
+			commentLength = endIndex - startIndex
+			+ commentEndExpression.matchedLength();
+		}
+		setFormat(startIndex, commentLength, multiLineCommentFormat);
+		startIndex = commentStartExpression.indexIn(text, startIndex + commentLength);
+	}
+
+//	setCurrentBlockState(0);
+
 
 }
 

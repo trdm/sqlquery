@@ -46,9 +46,13 @@
 #include <QStringListModel>
 #include <QString>
 #include <QCompleter>
+#include "sqlhighlighter.h"
+
 QT_BEGIN_NAMESPACE
 // !!! https://www.qtcentre.org/threads/23518-How-to-change-completion-rule-of-QCompleter
 //class QCompleter;
+
+// поиск: https://www.cyberforum.ru/qt/thread1721947.html
 QT_END_NAMESPACE
 
 class MyCompleter : public QCompleter
@@ -76,6 +80,7 @@ public:
 				filtered2 << var0; // не нужны уже набранные слова в попупе
 			}
 		}
+		filtered2.sort();
 		m_model.setStringList(filtered2);
 		m_word = word;
 		complete();
@@ -98,6 +103,7 @@ private:
 	QStringListModel m_model;
 	QString m_word;
 };
+
 class TextEdit : public QTextEdit
 {
     Q_OBJECT
@@ -106,7 +112,7 @@ public:
     TextEdit(QWidget *parent = 0);
     ~TextEdit();
 
-	void setCompleter(MyCompleter *c);
+	void setCompleter(MyCompleter *psCompleter);
 	MyCompleter *completer() const;
 	void updateList(const QStringList& words);
 
@@ -115,14 +121,24 @@ protected:
     void focusInEvent(QFocusEvent *e);
 	void contextMenuEvent(QContextMenuEvent *event);
 
+	void doSelTextToLine();
+	void doSelTextFormat();
+	void writeToFile(QString& psPath, QString& psSrc, bool psUtf8 = true);
+	QString loadFromFile(QString& psPath, bool psUtf8 = true);
+
+
 private slots:
     void insertCompletion(const QString &completion);
+	void onSelectionChanged();
 
 private:
     QString textUnderCursor() const;
+	SQLHighlighter *m_sqlhighlighter;
 
 private:
-	MyCompleter *c;
+	MyCompleter *completer_m;
+	QString m_selectWord;
+	QString m_ExePath;
 };
 //! [0]
 

@@ -48,33 +48,43 @@
 #include <QAbstractItemModel>
 #include <QScrollBar>
 #include <QMenu>
+#include <QProcess>
 
 TextEdit::TextEdit(QWidget *parent)
-: QTextEdit(parent), c(0)
+: QTextEdit(parent), completer_m(0)
 {
+	m_sqlhighlighter = new SQLHighlighter(document());
+	m_ExePath = qApp->applicationDirPath();
+	m_ExePath.append("/").append("SqlFormatter.exe");
+	if (!QFile::exists(m_ExePath)) {
+		m_ExePath = "";
+	}
+
+
 }
 TextEdit::~TextEdit()
 {
 }
-void TextEdit::setCompleter(MyCompleter *completer)
+void TextEdit::setCompleter(MyCompleter *psCompleter)
 {
-    if (c)
-        QObject::disconnect(c, 0, this, 0);
+	if (completer_m)
+		QObject::disconnect(completer_m, 0, this, 0);
 
-    c = completer;
+	completer_m = psCompleter;
 
-    if (!c)
+	if (!completer_m)
         return;
-
-    c->setWidget(this);
-    c->setCompletionMode(QCompleter::PopupCompletion);
-    c->setCaseSensitivity(Qt::CaseInsensitive);
-    QObject::connect(c, SIGNAL(activated(QString)),
+	m_selectWord = "";
+	completer_m->setWidget(this);
+	completer_m->setCompletionMode(QCompleter::PopupCompletion);
+	completer_m->setCaseSensitivity(Qt::CaseInsensitive);
+	QObject::connect(completer_m, SIGNAL(activated(QString)),
                      this, SLOT(insertCompletion(QString)));
+	connect(this,SIGNAL(selectionChanged()),this,SLOT(onSelectionChanged()));
 }
 MyCompleter *TextEdit::completer() const
 {
-	return c;
+	return completer_m;
 }
 
 void TextEdit::updateList(const QStringList &words)
@@ -84,14 +94,37 @@ void TextEdit::updateList(const QStringList &words)
 
 void TextEdit::insertCompletion(const QString& completion)
 {
-    if (c->widget() != this)
+	if (completer_m->widget() != this)
         return;
     QTextCursor tc = textCursor();
-    int extra = completion.length() - c->completionPrefix().length();
+	int extra = completion.length() - completer_m->completionPrefix().length();
     tc.movePosition(QTextCursor::Left);
     tc.movePosition(QTextCursor::EndOfWord);
     tc.insertText(completion.right(extra));
-    setTextCursor(tc);
+	setTextCursor(tc);
+}
+
+void TextEdit::onSelectionChanged()
+{
+	QString vSelectRes = textCursor().selectedText();
+	if (vSelectRes.isEmpty()) {
+		return;
+	} else {
+		vSelectRes = vSelectRes.trimmed();
+		if (vSelectRes.indexOf(" ") > 0) {
+			// оптимизадница...
+			return;
+		}
+	}
+	QRegExp re("(\\w+)");
+	m_sqlhighlighter->setWord("");
+	if (re.exactMatch(vSelectRes)) {
+		int ttt = 200;
+		m_sqlhighlighter->setWord(vSelectRes);
+	}
+	m_sqlhighlighter->rehighlight();
+	update();
+
 }
 QString TextEdit::textUnderCursor() const
 {
@@ -101,23 +134,175 @@ QString TextEdit::textUnderCursor() const
 }
 void TextEdit::focusInEvent(QFocusEvent *e)
 {
-    if (c)
-        c->setWidget(this);
+	if (completer_m)
+		completer_m->setWidget(this);
 	QTextEdit::focusInEvent(e);
 }
 
 // trdm 2022-03-17 23:08:44
 void TextEdit::contextMenuEvent(QContextMenuEvent *event) {
 	//http://www.prog.org.ru/topic_13418_0.html
+	QString vExePath = qApp->applicationDirPath();
 	QMenu *menu = createStandardContextMenu();
-	menu->addAction(tr("My Menu Item"));
+	QMenu *subMenu = new QMenu(this);
+	QAction *vActT, *vAct_1 = new QAction(tr("To singl line"),this);
+	QAction *vActFormat = new QAction(tr("Format"),this);
+
+	QAction *vActMenu =  menu->addMenu(subMenu);
+	vActMenu->setText("Until");
+	subMenu->addAction(vAct_1);
+	if (!m_ExePath.isEmpty()) {
+		///\todo - доделать не пашет....... OK
+		//subMenu->addAction(vActFormat);
+	}
 	 //...
-	 menu->exec(event->globalPos());
+	 vActT = menu->exec(event->globalPos());
+	 if (vAct_1 == vActT) {
+		 doSelTextToLine();
+	 } else if (vActT == vActFormat) {
+		 doSelTextFormat();
+	 }
+
+	 delete vAct_1;
+	 delete subMenu;
 	 delete menu;
+}
+
+void TextEdit::doSelTextToLine()
+{
+	QString vSel_2, vSel = textCursor().selectedText();
+   int vOldLen = 0;
+   QChar vch;
+   for (int var = 0; var < vSel.length(); ++var) {
+	   vch = vSel.at(var);
+	   int v2a = vch.toAscii();
+	   if (v2a != 63) { /*8233, 32*/
+		   vSel_2.append(vch);
+	   } else {
+		   vSel_2.append(' ');
+		   ++vOldLen;
+	   }
+   }
+   if (vOldLen != 0) {
+	   vSel_2.append("\r\n");
+	   QTextCursor cur = textCursor();
+	   setTextCursor(cur);
+	   cur.removeSelectedText();
+	   cur.insertText(vSel_2);
+   }
+
+}
+
+void TextEdit::doSelTextFormat()
+{
+	if (!QFile::exists(m_ExePath)) {
+		return;
+	}
+	QString vSel = textCursor().selectedText();
+	if (vSel.isEmpty()) {
+		return;
+	}
+	//QFile vFile(m_ExePath);
+	QString vExeFile = "SqlFormatter.exe";
+	QString vSqlFile = "SqlFormatter.sql";
+	QString vSqlFile2 = "SqlFormatter2.sql";
+	QString vSqlFile2p = " /o:SqlFormatter2.sql";
+	QString vBatFile = "SqlFormatter.bat";
+
+	QStringList vList = m_ExePath.split("/");
+
+	vList[vList.size()-1] = vBatFile;
+	QString vPathBat = vList.join("/");
+
+	vList[vList.size()-1] = vSqlFile;
+	QString vPathTxt = vList.join("/");
+
+	vList[vList.size()-1] = vSqlFile2;
+	QString vPathTxt2 = vList.join("/");
+
+	vList.removeAt(vList.size()-1);
+	QString vPathFolder = vList.join("/");
+	writeToFile(vPathTxt, vSel);
+	writeToFile(vPathBat, QString("SqlFormatter ").append(vSqlFile).append(vSqlFile2p),false);
+
+	QStringList arguments;
+	arguments << vSqlFile <<  vSqlFile2p;
+	//SqlFormatter test*.sql /o:resultfile.sql
+
+	QProcess myProcess; //= new QProcess(this);
+	myProcess.setWorkingDirectory(vPathFolder);
+	myProcess.start(vExeFile, arguments);
+	myProcess.waitForFinished(/*6000*/);
+//	if (!myProcess.waitForFinished())
+//		return;
+	QProcess::ProcessError err = myProcess.error();
+
+	myProcess.close();
+
+	vSel = loadFromFile(vPathTxt2);
+	if (!vSel.isEmpty()) {
+
+		QTextCursor cur = textCursor();
+		setTextCursor(cur);
+
+		//cur.removeSelectedText();
+		//insertPlainText(vSel);
+		//cur.insertText(vSel);
+
+		cur.beginEditBlock();
+		//cur.movePosition(QTextCursor::End);
+		QStringList string_list = vSel.split('\n');
+
+		for (int i = 0; i < string_list.size(); i++){
+			cur.insertText(string_list.at(i));
+			if ((i + 1) < string_list.size()){
+				cur.insertBlock();
+			}
+		}
+
+
+		cur.endEditBlock();
+	}
+
+
+	//qDebug() << vPathProc;
+
+}
+
+void TextEdit::writeToFile(QString &psPath, QString &psSrc, bool psUtf8)
+{
+	QFile vSqlFile(psPath);
+	if (!vSqlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+		return;
+	}
+	QTextStream out(&vSqlFile);
+	if (psUtf8) {
+		out.setCodec("UTF-8");
+	}
+	out << psSrc /*<< "\n"*/;
+	out.flush();
+	vSqlFile.close();
+}
+
+QString TextEdit::loadFromFile(QString &psPath, bool psUtf8)
+{
+	QString vRetVal = "";
+	QFile vSqlFile(psPath);
+	if (!vSqlFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		return vRetVal;
+	}
+	QTextStream in(&vSqlFile);
+	if (psUtf8) {
+		in.setCodec("UTF-8");
+	}
+	vRetVal = in.readAll();
+	vSqlFile.close();
+	return vRetVal;
+
 }
 void TextEdit::keyPressEvent(QKeyEvent *e)
 {
-    if (c && c->popup()->isVisible()) {
+	if (completer_m && completer_m->popup()->isVisible()) {
         // The following keys are forwarded by the completer to the widget
        switch (e->key()) {
        case Qt::Key_Enter:
@@ -132,31 +317,34 @@ void TextEdit::keyPressEvent(QKeyEvent *e)
        }
     }
 
-    bool isShortcut = ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_E); // CTRL+E
-    if (!c || !isShortcut) // do not process the shortcut when we have a completer
+	bool isShortcut = ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_E); // CTRL+E
+	bool isShortcutQ = ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_Q); // CTRL+Q
+	if (!completer_m || !isShortcut) // do not process the shortcut when we have a completer
         QTextEdit::keyPressEvent(e);
+	if (isShortcutQ) {
+		int tt = 20;
+	}
     const bool ctrlOrShift = e->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier);
-    if (!c || (ctrlOrShift && e->text().isEmpty()))
+	if (!completer_m || (ctrlOrShift && e->text().isEmpty()))
         return;
 
 	static QString eow("~!@#$%^&*()+{}|:\"<>?,./;'[]\\-="); // end of word
 	bool hasModifier = (e->modifiers() != Qt::NoModifier) && !ctrlOrShift;
 	QString completionPrefix = textUnderCursor(); 	//qDebug() << "textUnderCursor: "+completionPrefix;
 
-	if (!isShortcut && (hasModifier || e->text().isEmpty()|| completionPrefix.length() < 2
+	if (!isShortcut && (hasModifier || e->text().isEmpty()|| completionPrefix.length() < 1
                       || eow.contains(e->text().right(1)))) {
-        c->popup()->hide();
+		completer_m->popup()->hide();
         return;
     }
 
-    if (completionPrefix != c->completionPrefix()) {
-		c->update(completionPrefix);
-		c->setCompletionPrefix(completionPrefix);
-        c->popup()->setCurrentIndex(c->completionModel()->index(0, 0));
+	if (completionPrefix != completer_m->completionPrefix()) {
+		completer_m->update(completionPrefix);
+		completer_m->setCompletionPrefix(completionPrefix);
+		completer_m->popup()->setCurrentIndex(completer_m->completionModel()->index(0, 0));
     }
     QRect cr = cursorRect();
-    cr.setWidth(c->popup()->sizeHintForColumn(0)
-                + c->popup()->verticalScrollBar()->sizeHint().width());
-    c->complete(cr); // popup it up!
+	cr.setWidth(completer_m->popup()->sizeHintForColumn(0)+ completer_m->popup()->verticalScrollBar()->sizeHint().width());
+	completer_m->complete(cr); // popup it up!
 }
 
